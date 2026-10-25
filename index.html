@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Onboarding Step 3 — Progressive Disclosure Prototype (k3ed74007d1)</title>
+<style>
+/* ============================================================
+   DESIGN TOKENS — 8px spacing grid, accent #3B82F6
+   ============================================================ */
+:root{
+  --space-1:8px; --space-2:16px; --space-3:24px; --space-4:32px; --space-5:40px;
+  --accent:#3B82F6;            /* active states, focus rings, non-text UI (3.68:1 on white — passes 3:1 SC 1.4.11) */
+  --accent-text:#1D4ED8;       /* text-safe accent (6.70:1 on white — passes AA 4.5:1) */
+  --accent-hover:#2563EB;      /* 5.17:1 on white */
+  --ink:#111827; --ink-2:#374151; --ink-3:#6B7280;
+  --surface:#FFFFFF; --surface-2:#F9FAFB; --border:#D1D5DB; --border-strong:#9CA3AF;
+  --error:#B91C1C; --error-bg:#FEF2F2; --success:#15803D; --success-bg:#F0FDF4;
+  --radius:8px;
+}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--surface-2)}
+.modal{max-width:640px;margin:var(--space-4) auto;background:var(--surface);border-radius:12px;box-shadow:0 8px 32px rgba(17,24,39,.12);padding:var(--space-4)}
+h1{font-size:20px;margin:0 0 var(--space-1)}
+.sub{color:var(--ink-3);margin:0 0 var(--space-3);font-size:14px}
+
+/* ---------- Segmented control (tablist) ---------- */
+.segmented{display:flex;gap:var(--space-1);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:4px;margin-bottom:var(--space-3)}
+.segmented [role="tab"]{flex:1;padding:var(--space-1) var(--space-2);border:2px solid transparent;border-radius:6px;background:transparent;font:inherit;font-weight:600;color:var(--ink-3);cursor:pointer}
+.segmented [role="tab"]:hover{color:var(--ink)}
+.segmented [role="tab"][aria-selected="true"]{background:var(--surface);color:var(--accent-text);border-color:var(--accent);box-shadow:0 1px 2px rgba(17,24,39,.08)}
+.segmented [role="tab"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.segmented [role="tab"].done::after{content:" ✓";color:var(--success)}
+
+/* ---------- Cluster cards ---------- */
+.card{border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-3);display:grid;gap:var(--space-2)}
+.card[hidden]{display:none}
+.card.is-prev{opacity:.55;background:var(--surface-2)}       /* de-emphasized previous clusters */
+.card.is-prev .card-title::before{content:"✓ ";color:var(--success)}
+.field{display:grid;gap:4px}
+label{font-weight:600;font-size:14px;color:var(--ink-2)}
+input,select{font:inherit;padding:var(--space-1) 12px;border:1px solid var(--border-strong);border-radius:6px;background:var(--surface);color:var(--ink)}
+input:hover,select:hover{border-color:var(--ink-3)}
+input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-color:var(--accent)}
+input[aria-invalid="true"]{border-color:var(--error);background:var(--error-bg)}
+input[aria-invalid="true"]:focus-visible{outline-color:var(--error)}
+input:disabled{background:var(--surface-2);color:var(--ink-3);cursor:not-allowed}
+.msg{font-size:13px;min-height:18px;color:var(--ink-3)}
+.msg.err{color:var(--error);font-weight:600}
+.msg.ok{color:var(--success);font-weight:600}
+.card-actions{display:flex;gap:var(--space-1);align-items:center;flex-wrap:wrap}
+.btn{font:inherit;font-weight:600;padding:10px var(--space-2);border-radius:6px;border:1px solid transparent;cursor:pointer}
+.btn-primary{background:var(--accent-text);color:#fff}          /* 6.70:1 — AA text */
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-primary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn-primary:disabled{background:var(--border);color:var(--ink-3);cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--accent-text);border-color:var(--border-strong)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent-hover)}
+.btn-ghost:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* forward momentum: only the ACTIVE cluster's primary button is full-contrast; done clusters shrink */
+.card.is-prev .btn-primary{background:var(--surface);color:var(--ink-3);border-color:var(--border);font-weight:400;padding:6px 12px;font-size:13px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.saved-note{font-size:13px;color:var(--success)}
+</style>
+</head>
+<body>
+<main class="modal" aria-labelledby="h1">
+  <h1 id="h1">Connect your data — Step 3 of 4</h1>
+  <p class="sub">Set up one source group at a time. Your progress saves automatically when you hit Save for Later.</p>
+
+  <div class="segmented" role="tablist" aria-label="Data source groups">
+    <button role="tab" id="tab-cloud" aria-controls="panel-cloud" aria-selected="true"  tabindex="0"  data-cluster="cloud">Cloud</button>
+    <button role="tab" id="tab-local" aria-controls="panel-local" aria-selected="false" tabindex="-1" data-cluster="local">Local</button>
+    <button role="tab" id="tab-api"   aria-controls="panel-api"   aria-selected="false" tabindex="-1" data-cluster="api">API</button>
+  </div>
+
+  <form id="wizard" novalidate>
+    <!-- CLOUD cluster -->
+    <section class="card" id="panel-cloud" role="tabpanel" aria-labelledby="tab-cloud" data-cluster="cloud">
+      <h2 class="card-title" style="font-size:16px;margin:0">Cloud providers</h2>
+      <div class="field">
+        <label for="cloud-provider">Provider</label>
+        <select id="cloud-provider" name="cloud_provider"><option value="">Select…</option><option>Snowflake</option><option>BigQuery</option><option>Redshift</option></select>
+        <p class="msg" id="cloud-provider-msg" aria-live="polite"></p>
+      </div>
+      <div class="field">
+        <label for="cloud-account">Account identifier</label>
+        <input id="cloud-account" name="cloud_account" type="text" autocomplete="off" placeholder="e.g. acme.us-east-1">
+        <p class="msg" id="cloud-account-msg" aria-live="polite"></p>
+      </div>
+      <div class="card-actions">
+        <button type="button" class="btn btn-primary" data-act="next">Save &amp; continue</button>
+        <button type="button" class="btn btn-ghost" data-act="save">Save for Later</button>
+        <span class="saved-note" data-saved hidden>Saved — resume anytime</span>
+      </div>
+    </section>
+
+    <!-- LOCAL cluster -->
+    <section class="card" id="panel-local" role="tabpanel" aria-labelledby="tab-local" data-cluster="local" hidden>
+      <h2 class="card-title" style="font-size:16px;margin:0">Local files</h2>
+      <div class="field">
+        <label for="local-path">Folder path</label>
+        <input id="local-path" name="local_path" type="text" autocomplete="off" placeholder="/data/exports">
+        <p class="msg" id="local-path-msg" aria-live="polite"></p>
+      </div>
+      <div class="field">
+        <label for="local-format">File format</label>
+        <select id="local-format" name="local_format"><option value="">Select…</option><option>CSV</option><option>Parquet</option><option>JSONL</option></select>
+        <p class="msg" id="local-format-msg" aria-live="polite"></p>
+      </div>
+      <div class="card-actions">
+        <button type="button" class="btn btn-primary" data-act="next">Save &amp; continue</button>
+        <button type="button" class="btn btn-ghost" data-act="save">Save for Later</button>
+        <span class="saved-note" data-saved hidden>Saved — resume anytime</span>
+      </div>
+    </section>
+
+    <!-- API cluster -->
+    <section class="card" id="panel-api" role="tabpanel" aria-labelledby="tab-api" data-cluster="api" hidden>
+      <h2 class="card-title" style="font-size:16px;margin:0">API endpoints</h2>
+      <div class="field">
+        <label for="api-endpoint">Base URL</label>
+        <input id="api-endpoint" name="api_endpoint" type="url" autocomplete="off" placeholder="https://api.example.com/v1">
+        <p class="msg" id="api-endpoint-msg" aria-live="polite"></p>
+      </div>
+      <div class="field">
+        <label for="api-key">API key</label>
+        <input id="api-key" name="api_key" type="password" autocomplete="off" placeholder="sk-…">
+        <p class="msg" id="api-key-msg" aria-live="polite"></p>
+      </div>
+      <div class="card-actions">
+        <button type="button" class="btn btn-primary" data-act="next">Finish setup</button>
+        <button type="button" class="btn btn-ghost" data-act="save">Save for Later</button>
+        <span class="saved-note" data-saved hidden>Saved — resume anytime</span>
+      </div>
+    </section>
+    <p class="sr-only" role="status" aria-live="polite" id="cluster-status"></p>
+  </form>
+</main>
+
+<script>
+/* ============================================================
+   localStorage persistence — key: onboarding_data_source_state
+   { cloud_config:{provider,account}, local_config:{path,format},
+     api_config:{endpoint,key_ref}, last_active:"cloud|local|api",
+     completed:[...], saved_at:ISO8601 }
+   ============================================================ */
+const KEY="onboarding_data_source_state";
+const CLUSTERS=["cloud","local","api"];
+const FIELDS={cloud:["cloud_provider","cloud_account"],local:["local_path","local_format"],api:["api_endpoint","api_key"]};
+const RULES={
+  cloud_provider:v=>v?"":"Choose a provider to continue.",
+  cloud_account:v=>/^[a-z0-9][a-z0-9.-]{2,}$/.test(v)?"":"Use 3+ lowercase chars (letters, digits, dots, dashes).",
+  local_path:v=>v.startsWith("/")&&v.length>1?"":"Enter an absolute path like /data/exports.",
+  local_format:v=>v?"":"Pick the file format.",
+  api_endpoint:v=>/^https:\/\/[^\s]{4,}$/.test(v)?"":"Must start with https:// (TLS required).",
+  api_key:v=>v.length>=8?"":"API key must be at least 8 characters."
+};
+const state=Object.assign({cloud_config:{},local_config:{},api_config:{},last_active:"cloud",completed:[],saved_at:null},JSON.parse(localStorage.getItem(KEY)||"{}"));
+function persist(){state.saved_at=new Date().toISOString();localStorage.setItem(KEY,JSON.stringify(state));}
+function capture(cluster){const o={};FIELDS[cluster].forEach(n=>{o[n]=form.elements[n].value;});return o;}
+const form=document.getElementById("wizard");
+const tabs=[...document.querySelectorAll('[role="tab"]')];
+const status=document.getElementById("cluster-status");
+/* blur-only inline validation — never on keystroke */
+Object.keys(RULES).forEach(name=>{
+  const el=form.elements[name];
+  el.addEventListener("blur",()=>validate(name));
+});
+function validate(name){
+  const el=form.elements[name],msg=document.getElementById(name.replace("_","-")+"-msg")||document.getElementById(name+"-msg");
+  const err=RULES[name](el.value.trim());
+  el.setAttribute("aria-invalid",err?"true":"false");
+  el.setAttribute("aria-describedby",msg.id);
+  msg.textContent=err||(el.value.trim()?"Looks good":"");
+  msg.className="msg "+(err?"err":el.value.trim()?"ok":"");
+  return !err;
+}
+function msgId(n){return n.replace(/_/g,"-")+"-msg";}
+function show(cluster){
+  tabs.forEach(t=>{const on=t.dataset.cluster===cluster;t.setAttribute("aria-selected",on);t.tabIndex=on?0:-1;
+    t.classList.toggle("done",state.completed.includes(t.dataset.cluster));});
+  document.querySelectorAll(".card").forEach(c=>{
+    const on=c.dataset.cluster===cluster;
+    c.hidden=!on;
+    c.classList.toggle("is-prev",state.completed.includes(c.dataset.cluster)&&!on);
+  });
+  state.last_active=cluster;persist();
+  status.textContent=tabs.find(t=>t.dataset.cluster===cluster).textContent+" section shown, cluster "+(CLUSTERS.indexOf(cluster)+1)+" of 3.";
+}
+tabs.forEach((t,i)=>t.addEventListener("keydown",e=>{
+  let j=null;if(e.key==="ArrowRight")j=(i+1)%3;if(e.key==="ArrowLeft")j=(i+2)%3;if(e.key==="Home")j=0;if(e.key==="End")j=2;
+  if(j!==null){e.preventDefault();show(tabs[j].dataset.cluster);tabs[j].focus();}
+}));
+tabs.forEach(t=>t.addEventListener("click",()=>show(t.dataset.cluster)));
+form.addEventListener("click",e=>{
+  const b=e.target.closest("button[data-act]");if(!b)return;
+  const card=b.closest(".card"),cluster=card.dataset.cluster;
+  if(b.dataset.act==="save"){state[cluster+"_config"]=capture(cluster);persist();card.querySelector("[data-saved]").hidden=false;status.textContent="Progress saved. You can safely close and resume later.";return;}
+  const allValid=FIELDS[cluster].map(validate).every(Boolean);
+  if(!allValid){status.textContent="Fix the highlighted fields before continuing.";card.querySelector('[aria-invalid="true"]').focus();return;}
+  state[cluster+"_config"]=capture(cluster);
+  if(!state.completed.includes(cluster))state.completed.push(cluster);
+  persist();
+  const next=CLUSTERS[CLUSTERS.indexOf(cluster)+1];
+  if(next){show(next);tabs.find(t=>t.dataset.cluster===next).focus();}
+  else{status.textContent="All three clusters complete — setup finished.";alert("Step 3 complete. state="+KEY+" holds all three configs.");}
+});
+/* restore on load (resume-on-later-session) */
+(function restore(){
+  CLUSTERS.forEach(c=>{const cfg=state[c+"_config"]||{};FIELDS[c].forEach(n=>{const k=Object.keys(cfg).find(k=>n.endsWith(k)||k===n);if(k&&cfg[k])form.elements[n].value=cfg[k];});});
+  show(CLUSTERS.includes(state.last_active)?state.last_active:"cloud");
+})();
+</script>
+</body>
+</html>
